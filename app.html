@@ -705,6 +705,35 @@
             document.getElementById('trip-title-input').value = state.tripTitle;
         }
 
+        // Copy text using the async Clipboard API, falling back to execCommand
+        // where it is unavailable (non-secure contexts) or blocked (e.g. iframes)
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+            }
+            return legacyCopy(text);
+        }
+
+        function legacyCopy(text) {
+            return new Promise((resolve, reject) => {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = text;
+                tempTextArea.setAttribute('readonly', '');
+                tempTextArea.style.position = 'fixed';
+                tempTextArea.style.left = '-9999px';
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                let ok = false;
+                try {
+                    ok = document.execCommand('copy');
+                } catch (err) {
+                    ok = false;
+                }
+                document.body.removeChild(tempTextArea);
+                ok ? resolve() : reject(new Error('Copy failed'));
+            });
+        }
+
         // Escape HTML helper to prevent XSS in custom items
         function escapeHTML(str) {
             const div = document.createElement('div');
@@ -1402,7 +1431,7 @@
                 });
             });
 
-            // Copy Checklist Summary to Clipboard (using document.execCommand('copy') for iframe compatibility)
+            // Copy Checklist Summary to Clipboard
             document.getElementById('copy-list-btn').addEventListener('click', () => {
                 const packed = state.items.filter(i => i.packed).length;
                 const total = state.items.length;
@@ -1423,19 +1452,9 @@
                     }
                 });
 
-                const tempTextArea = document.createElement('textarea');
-                tempTextArea.value = text;
-                tempTextArea.style.position = 'fixed';
-                tempTextArea.style.left = '-9999px';
-                document.body.appendChild(tempTextArea);
-                tempTextArea.select();
-                try {
-                    document.execCommand('copy');
-                    showToast('Checklist copied to clipboard!');
-                } catch (err) {
-                    showToast('Could not copy checklist');
-                }
-                document.body.removeChild(tempTextArea);
+                copyToClipboard(text)
+                    .then(() => showToast('Checklist copied to clipboard!'))
+                    .catch(() => showToast('Could not copy checklist'));
             });
 
             // Sound & Theme Toggles
