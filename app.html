@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PackSmart — Interactive Holiday Packing Checklist</title>
+    <meta name="description" content="Your interactive holiday packing checklist. Tick items off, track progress and never forget the essentials.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts: Inter -->
@@ -11,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 
     <script>
         tailwind.config = {
@@ -102,9 +104,9 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
             <!-- Brand & Editable Trip Name -->
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20 shrink-0">
+                <a href="/" title="Back to home" aria-label="PackSmart home" class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20 shrink-0 hover:scale-105 transition-transform">
                     <i class="ph-fill ph-suitcase-rolling text-2xl"></i>
-                </div>
+                </a>
                 <div>
                     <div class="flex items-center gap-2">
                         <input
@@ -1464,6 +1466,17 @@
             loadState();
             initEventListeners();
             renderApp();
+
+            // Deep link from the landing page, e.g. /app?template=winter
+            const params = new URLSearchParams(window.location.search);
+            const templateKey = params.get('template');
+            if (templateKey && PRESET_TEMPLATES[templateKey]) {
+                const option = document.querySelector(`.template-option[data-template="${templateKey}"]`);
+                if (option) option.click();
+            }
+            if (templateKey) {
+                history.replaceState(null, '', window.location.pathname);
+            }
         });
     </script>
 </body>
