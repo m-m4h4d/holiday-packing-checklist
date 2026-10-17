@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PackSmart — Interactive Holiday Packing Checklist</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef9ff',
+                            100: '#d8f1ff',
+                            200: '#b9e7ff',
+                            300: '#89daff',
+                            400: '#52c3ff',
+                            500: '#2aa4ff',
+                            600: '#1384f8',
+                            700: '#0c6ce4',
+                            800: '#1058b9',
+                            900: '#134b92',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Smooth progress bar transitions */
+        .progress-bar-fill {
+            transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+        }
+
+        /* Custom Checkbox Animation */
+        .custom-checkbox {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .custom-checkbox:active {
+            transform: scale(0.9);
+        }
+
+        /* Item row transition */
+        .packing-item {
+            transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.7);
+        }
+
+        /* Subtle shimmer on 100% completion */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .complete-shimmer {
+            background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #059669 100%);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen transition-colors duration-200 selection:bg-brand-500 selection:text-white pb-16">
+
+    <!-- Confetti Canvas Overlay -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full hidden"></canvas>
+
+    <!-- Top Navigation & Trip Header -->
+    <header class="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand & Editable Trip Name -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20 shrink-0">
+                    <i class="ph-fill ph-suitcase-rolling text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <input
+                            id="trip-title-input"
+                            type="text"
+                            value="Summer Holiday Getaway"
+                            aria-label="Trip Title"
+                            class="font-bold text-lg sm:text-xl bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-brand-500 focus:outline-none px-1 -ml-1 rounded transition-colors w-48 sm:w-72 truncate"
+                            title="Click to rename your trip"
+                        />
+                        <i class="ph ph-pencil-simple text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium" id="save-indicator">
+                            <i class="ph-fill ph-check-circle"></i> Saved locally
+                        </span>
+                        <span>•</span>
+                        <span id="last-updated-text">Ready to pack</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex items-center gap-2">
+                <!-- Preset Templates Dropdown Button -->
+                <div class="relative">
+                    <button id="templates-btn" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
+                        <i class="ph ph-magic-wand text-brand-500 text-base"></i>
+                        <span>Templates</span>
+                        <i class="ph ph-caret-down text-xs"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="templates-menu" class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-40">
+                        <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Load Packing Preset</div>
+                        <button data-template="beach" class="template-option w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+                            <span class="text-lg">🏖️</span>
+                            <div>
+                                <div class="font-medium">Beach Holiday</div>
+                                <div class="text-xs text-slate-400">Sun, swim & resort essentials</div>
+                            </div>
+                        </button>
+                        <button data-template="city" class="template-option w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+                            <span class="text-lg">🏙️</span>
+                            <div>
+                                <div class="font-medium">City Break</div>
+                                <div class="text-xs text-slate-400">Sightseeing & light travel</div>
+                            </div>
+                        </button>
+                        <button data-template="winter" class="template-option w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+                            <span class="text-lg">❄️</span>
+                            <div>
+                                <div class="font-medium">Winter & Mountain</div>
+                                <div class="text-xs text-slate-400">Thermal layers & cold gear</div>
+                            </div>
+                        </button>
+                        <button data-template="camping" class="template-option w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+                            <span class="text-lg">⛺</span>
+                            <div>
+                                <div class="font-medium">Nature & Adventure</div>
+                                <div class="text-xs text-slate-400">Outdoor & hiking gear</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Export / Copy Button -->
+                <button id="copy-list-btn" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Copy checklist to clipboard">
+                    <i class="ph ph-copy text-base"></i>
+                    <span class="hidden sm:inline">Export</span>
+                </button>
+
+                <!-- Sound Toggle -->
+                <button id="sound-toggle-btn" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Toggle sound effects" aria-label="Toggle sound effects">
+                    <i id="sound-icon" class="ph ph-speaker-high text-lg"></i>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button id="theme-toggle-btn" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Toggle dark mode" aria-label="Toggle dark mode">
+                    <i id="theme-icon" class="ph ph-moon text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+
+        <!-- HERO COMPLETION BAR & STATS CARD -->
+        <section class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 shadow-sm border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
+            <!-- Decorative background glow -->
+            <div class=" -top-24 -right-24 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none absolute"></div>
+
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 dark:bg-brand-950/70 text-brand-700 dark:text-brand-300 mb-2">
+                        <span id="status-emoji">🧳</span>
+                        <span id="status-headline">Packing in Progress</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-baseline gap-3">
+                        <span id="completion-percentage">0%</span>
+                        <span class="text-sm sm:text-base font-medium text-slate-500 dark:text-slate-400" id="completion-subtitle">0 of 0 items packed</span>
+                    </h1>
+                </div>
+
+                <!-- Summary Pills & Quick Bulk Actions -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+                        <i class="ph-fill ph-star text-amber-500"></i>
+                        <span>Essentials left: <strong id="essentials-left-count">0</strong></span>
+                    </div>
+
+                    <button id="uncheck-all-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Unpack all items for your next trip">
+                        <i class="ph ph-arrow-counter-clockwise"></i>
+                        <span>Unpack All</span>
+                    </button>
+
+                    <button id="pack-all-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 text-brand-700 dark:text-brand-300 transition">
+                        <i class="ph ph-checks"></i>
+                        <span>Check All</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Animated Completion Bar -->
+            <div class="relative w-full h-5 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden p-0.5 shadow-inner">
+                <div
+                    id="main-progress-bar"
+                    class="progress-bar-fill h-full rounded-xl bg-gradient-to-r from-brand-500 via-sky-500 to-teal-400 relative"
+                    style="width: 0%"
+                    role="progressbar"
+                    aria-valuenow="0"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                ></div>
+            </div>
+
+            <!-- Category Mini-Breakdown Strip -->
+            <div id="category-breakdown-strip" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-5 pt-5 border-t border-slate-100 dark:border-slate-800/80">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </section>
+
+        <!-- ADD CUSTOM ITEM & FILTER CONTROLS -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <!-- Add Custom Item Form Card -->
+            <form id="add-item-form" class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                        <i class="ph-bold ph-plus-circle text-brand-500 text-sm"></i>
+                        Add Custom Packing Item
+                    </h2>
+                    <span class="text-[11px] text-slate-400">Press Enter to add</span>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2.5">
+                    <!-- Item Name Input -->
+                    <div class="relative flex-1">
+                        <input
+                            id="new-item-name"
+                            type="text"
+                            required
+                            placeholder="e.g., Universal Power Adapter, Sunglasses..."
+                            class="w-full pl-3.5 pr-3 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition"
+                        />
+                    </div>
+
+                    <!-- Category Select -->
+                    <div class="sm:w-44">
+                        <select
+                            id="new-item-category"
+                            aria-label="Select Category"
+                            class="w-full px-3 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:outline-none transition"
+                        >
+                            <option value="essentials">🛂 Travel Docs & Money</option>
+                            <option value="clothing">👕 Clothing</option>
+                            <option value="toiletries">🧴 Toiletries & Health</option>
+                            <option value="electronics">🔌 Tech & Electronics</option>
+                            <option value="footwear">👟 Footwear & Accessories</option>
+                            <option value="misc">🎒 Miscellaneous</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70">
+                    <div class="flex items-center gap-3">
+                        <!-- Quantity Stepper -->
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200/60 dark:border-slate-700">
+                            <button type="button" id="qty-minus" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition text-xs font-bold" aria-label="Decrease quantity">-</button>
+                            <span id="new-item-qty-display" class="px-2.5 text-xs font-bold text-slate-700 dark:text-slate-200">1x</span>
+                            <button type="button" id="qty-plus" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition text-xs font-bold" aria-label="Increase quantity">+</button>
+                        </div>
+
+                        <!-- Essential Toggle Button -->
+                        <button
+                            type="button"
+                            id="new-item-essential-btn"
+                            aria-pressed="false"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400 transition"
+                        >
+                            <i class="ph-fill ph-star text-slate-400 transition-colors" id="essential-star-icon"></i>
+                            <span>Mark Essential</span>
+                        </button>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button
+                        type="submit"
+                        class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-500 active:scale-[0.99] text-white shadow-sm shadow-brand-500/20 transition"
+                    >
+                        <i class="ph-bold ph-plus"></i>
+                        <span>Add to List</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Filter by Status & Search Card -->
+            <div class="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                        <i class="ph-bold ph-funnel text-brand-500 text-sm"></i>
+                        Filter & Search Items
+                    </h2>
+                    <button id="reset-defaults-btn" class="text-[11px] font-medium text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:underline">
+                        Reset Default List
+                    </button>
+                </div>
+
+                <!-- Status Filter Segmented Bar -->
+                <div class="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl" role="tablist" aria-label="Filter items by packing status">
+                    <button data-filter="all" class="status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
+                        <span>All</span>
+                        <span id="badge-all" class="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">0</span>
+                    </button>
+                    <button data-filter="unpacked" class="status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <span>To Pack</span>
+                        <span id="badge-unpacked" class="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">0</span>
+                    </button>
+                    <button data-filter="packed" class="status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <span>Packed</span>
+                        <span id="badge-packed" class="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">0</span>
+                    </button>
+                    <button data-filter="essential" class="status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                        <i class="ph-fill ph-star text-amber-500 text-xs"></i>
+                        <span>Must</span>
+                        <span id="badge-essential" class="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">0</span>
+                    </button>
+                </div>
+
+                <!-- Search Input -->
+                <div class="relative">
+                    <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+                    <input
+                        id="search-input"
+                        type="search"
+                        placeholder="Filter items by name..."
+                        class="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:outline-none transition"
+                    />
+                    <button id="clear-search-btn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1" aria-label="Clear search">
+                        <i class="ph-fill ph-x-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Empty State (Hidden unless filters match nothing) -->
+        <div id="empty-state" class="hidden bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-dashed border-slate-300 dark:border-slate-800">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-3xl">
+                🔍
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1" id="empty-state-title">No matching items found</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5" id="empty-state-desc">
+                Try switching your status filter back to "All" or clearing your search query.
+            </p>
+            <button id="clear-filters-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+                <i class="ph ph-funnel-x"></i>
+                <span>Show All Items</span>
+            </button>
+        </div>
+
+        <!-- CATEGORIZED PACKING CHECKLIST GRID -->
+        <section id="categories-container" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Dynamically rendered by JavaScript -->
+        </section>
+    </main>
+
+    <!-- Custom Confirmation Modal (No native confirm/alert used) -->
+    <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex items-start gap-4">
+                <div id="modal-icon-box" class="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 text-xl">
+                    <i class="ph-fill ph-warning-circle"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 id="modal-title" class="text-lg font-bold text-slate-900 dark:text-white">Confirm Action</h3>
+                    <p id="modal-message" class="text-sm text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                        Are you sure you want to proceed?
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2.5 mt-6">
+                <button id="modal-cancel-btn" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Toast Notification (With optional Undo button) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Application Logic -->
+    <script>
+        /**
+         * PackSmart — Holiday Packing Checklist Application
+         * Complete state management, local storage persistence, audio synthesizer, and UI renderer.
+         */
+
+        const STORAGE_KEY = 'packsmart_holiday_checklist_v1';
+
+        // Category Metadata Definitions
+        const CATEGORIES = [
+            {
+                id: 'essentials',
+                name: 'Travel Docs & Money',
+                emoji: '🛂',
+                accent: 'rose',
+                badgeBg: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300',
+                barColor: 'bg-rose-500'
+            },
+            {
+                id: 'clothing',
+                name: 'Clothing',
+                emoji: '👕',
+                accent: 'sky',
+                badgeBg: 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300',
+                barColor: 'bg-sky-500'
+            },
+            {
+                id: 'toiletries',
+                name: 'Toiletries & Health',
+                emoji: '🧴',
+                accent: 'teal',
+                badgeBg: 'bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300',
+                barColor: 'bg-teal-500'
+            },
+            {
+                id: 'electronics',
+                name: 'Tech & Electronics',
+                emoji: '🔌',
+                accent: 'indigo',
+                badgeBg: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300',
+                barColor: 'bg-indigo-500'
+            },
+            {
+                id: 'footwear',
+                name: 'Footwear & Accessories',
+                emoji: '👟',
+                accent: 'amber',
+                badgeBg: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300',
+                barColor: 'bg-amber-500'
+            },
+            {
+                id: 'misc',
+                name: 'Miscellaneous & Gear',
+                emoji: '🎒',
+                accent: 'purple',
+                badgeBg: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300',
+                barColor: 'bg-purple-500'
+            }
+        ];
+
+        // Preset Templates for different holiday types
+        const PRESET_TEMPLATES = {
+            beach: {
+                title: 'Tropical Beach Getaway',
+                items: [
+                    { id: 'b1', name: 'Passport / National ID', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'b2', name: 'Flight Boarding Passes & Hotel Info', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'b3', name: 'Credit Cards & Local Cash', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'b4', name: 'Travel Insurance Policy', category: 'essentials', qty: 1, packed: false, essential: false },
+                    { id: 'b5', name: 'Swimsuits / Boardshorts', category: 'clothing', qty: 3, packed: false, essential: true },
+                    { id: 'b6', name: 'Breathable T-Shirts & Tank Tops', category: 'clothing', qty: 5, packed: false, essential: false },
+                    { id: 'b7', name: 'Shorts & Linen Resort Wear', category: 'clothing', qty: 4, packed: false, essential: false },
+                    { id: 'b8', name: 'Underwear & Socks', category: 'clothing', qty: 6, packed: false, essential: true },
+                    { id: 'b9', name: 'Light Evening Cardigan / Breeze Jacket', category: 'clothing', qty: 1, packed: false, essential: false },
+                    { id: 'b10', name: 'Reef-Safe Sunscreen (SPF 50+)', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'b11', name: 'Toothbrush, Toothpaste & Floss', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'b12', name: 'Aloe Vera After-Sun Gel', category: 'toiletries', qty: 1, packed: false, essential: false },
+                    { id: 'b13', name: 'First-Aid & Personal Medications', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'b14', name: 'Smartphone & Fast Charger', category: 'electronics', qty: 1, packed: false, essential: true },
+                    { id: 'b15', name: 'Portable Power Bank', category: 'electronics', qty: 1, packed: false, essential: false },
+                    { id: 'b16', name: 'Waterproof Phone Pouch', category: 'electronics', qty: 1, packed: false, essential: false },
+                    { id: 'b17', name: 'Noise-Canceling Earbuds', category: 'electronics', qty: 1, packed: false, essential: false },
+                    { id: 'b18', name: 'Polarized Sunglasses', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'b19', name: 'Flip-Flops / Beach Sandals', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'b20', name: 'Wide-Brim Sun Hat', category: 'footwear', qty: 1, packed: false, essential: false },
+                    { id: 'b21', name: 'Comfortable Walking Sneakers', category: 'footwear', qty: 1, packed: false, essential: false },
+                    { id: 'b22', name: 'Quick-Dry Microfiber Beach Towel', category: 'misc', qty: 1, packed: false, essential: false },
+                    { id: 'b23', name: 'Reusable Insulated Water Bottle', category: 'misc', qty: 1, packed: false, essential: false },
+                    { id: 'b24', name: 'Foldable Beach Tote / Daypack', category: 'misc', qty: 1, packed: false, essential: false }
+                ]
+            },
+            city: {
+                title: 'European City Break',
+                items: [
+                    { id: 'c1', name: 'Passport / ID & Visa Docs', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'c2', name: 'Transit Cards & Travel Wallet', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'c3', name: 'Smart-Casual Outfits', category: 'clothing', qty: 4, packed: false, essential: false },
+                    { id: 'c4', name: 'Light Rain Jacket / Trench Coat', category: 'clothing', qty: 1, packed: false, essential: true },
+                    { id: 'c5', name: 'Underwear & Walking Socks', category: 'clothing', qty: 5, packed: false, essential: true },
+                    { id: 'c6', name: 'Travel-Size Toiletries Kit', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'c7', name: 'Blister Plasters & Pain Relievers', category: 'toiletries', qty: 1, packed: false, essential: false },
+                    { id: 'c8', name: 'Universal Travel Adapter', category: 'electronics', qty: 1, packed: false, essential: true },
+                    { id: 'c9', name: 'High-Capacity Power Bank', category: 'electronics', qty: 1, packed: false, essential: true },
+                    { id: 'c10', name: 'Camera & Extra SD Card', category: 'electronics', qty: 1, packed: false, essential: false },
+                    { id: 'c11', name: 'Broken-In Walking Shoes', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'c12', name: 'Evening Dinner Shoes', category: 'footwear', qty: 1, packed: false, essential: false },
+                    { id: 'c13', name: 'Anti-Theft Crossbody Day Bag', category: 'misc', qty: 1, packed: false, essential: true },
+                    { id: 'c14', name: 'Compact Travel Umbrella', category: 'misc', qty: 1, packed: false, essential: false }
+                ]
+            },
+            winter: {
+                title: 'Winter Mountain Escape',
+                items: [
+                    { id: 'w1', name: 'Passport, ID & Resort Pass', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'w2', name: 'Thermal Base Layers (Top & Bottom)', category: 'clothing', qty: 3, packed: false, essential: true },
+                    { id: 'w3', name: 'Insulated Winter Parka / Ski Jacket', category: 'clothing', qty: 1, packed: false, essential: true },
+                    { id: 'w4', name: 'Fleece Mid-Layer Pullovers', category: 'clothing', qty: 2, packed: false, essential: false },
+                    { id: 'w5', name: 'Merino Wool Thermal Socks', category: 'clothing', qty: 5, packed: false, essential: true },
+                    { id: 'w6', name: 'Rich Moisturizer & Lip Balm (SPF)', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'w7', name: 'Phone, Charger & Cold-Weather Powerbank', category: 'electronics', qty: 1, packed: false, essential: true },
+                    { id: 'w8', name: 'Waterproof Insulated Winter Boots', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'w9', name: 'Thermal Gloves, Beanie & Neck Gaiter', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'w10', name: 'Pocket Hand Warmers', category: 'misc', qty: 4, packed: false, essential: false },
+                    { id: 'w11', name: 'Vacuum Travel Thermos', category: 'misc', qty: 1, packed: false, essential: false }
+                ]
+            },
+            camping: {
+                title: 'Nature & Camping Adventure',
+                items: [
+                    { id: 'a1', name: 'Park Permits, ID & Offline Maps', category: 'essentials', qty: 1, packed: false, essential: true },
+                    { id: 'a2', name: 'Moisture-Wicking Hiking Shirts', category: 'clothing', qty: 3, packed: false, essential: true },
+                    { id: 'a3', name: 'Convertible Trekking Pants', category: 'clothing', qty: 2, packed: false, essential: false },
+                    { id: 'a4', name: 'Packable Rain Shell', category: 'clothing', qty: 1, packed: false, essential: true },
+                    { id: 'a5', name: 'Insect Repellent & Sunscreen', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'a6', name: 'Comprehensive First-Aid Kit', category: 'toiletries', qty: 1, packed: false, essential: true },
+                    { id: 'a7', name: 'Rechargeable LED Headlamp', category: 'electronics', qty: 1, packed: false, essential: true },
+                    { id: 'a8', name: 'Solar / Rugged Power Bank', category: 'electronics', qty: 1, packed: false, essential: false },
+                    { id: 'a9', name: 'Trail Hiking Boots & Camp Sandals', category: 'footwear', qty: 1, packed: false, essential: true },
+                    { id: 'a10', name: 'Multi-Tool & Carabiner Clips', category: 'misc', qty: 1, packed: false, essential: false },
+                    { id: 'a11', name: '2L Hydration Bladder / Water Bottle', category: 'misc', qty: 1, packed: false, essential: true }
+                ]
+            }
+        };
+
+        // Application State
+        let state = {
+            tripTitle: PRESET_TEMPLATES.beach.title,
+            items: JSON.parse(JSON.stringify(PRESET_TEMPLATES.beach.items)),
+            filterStatus: 'all', // 'all' | 'unpacked' | 'packed' | 'essential'
+            searchQuery: '',
+            newItemQty: 1,
+            newItemEssential: false,
+            soundEnabled: true,
+            darkMode: false,
+            lastCelebratedCount: 0
+        };
+
+        // Web Audio API Synthesizer for subtle tactile feedback
+        let audioCtx = null;
+        function playSound(type) {
+            if (!state.soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const now = audioCtx.currentTime;
+
+                if (type === 'check') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.09);
+                } else if (type === 'uncheck') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(480, now);
+                    osc.frequency.exponentialRampToValueAtTime(300, now + 0.07);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'complete') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        gain.gain.setValueAtTime(0.1, now + idx * 0.09);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.35);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.09);
+                        osc.stop(now + idx * 0.09 + 0.35);
+                    });
+                }
+            } catch (e) {
+                // Ignore audio errors if blocked by browser autoplay policy
+            }
+        }
+
+        // Load Saved State from LocalStorage
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && Array.isArray(parsed.items)) {
+                        state.tripTitle = parsed.tripTitle || state.tripTitle;
+                        state.items = parsed.items;
+                        state.soundEnabled = parsed.soundEnabled !== undefined ? parsed.soundEnabled : true;
+                        state.darkMode = Boolean(parsed.darkMode);
+                    }
+                } else {
+                    // Check system dark mode preference on first visit
+                    state.darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+            } catch (err) {
+                console.error('Failed to read localStorage:', err);
+            }
+            applyThemeAndSoundUI();
+        }
+
+        // Save State to LocalStorage
+        function saveState() {
+            try {
+                const payload = {
+                    tripTitle: state.tripTitle,
+                    items: state.items,
+                    soundEnabled: state.soundEnabled,
+                    darkMode: state.darkMode,
+                    updatedAt: new Date().toISOString()
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+                // Pulse save indicator
+                const saveInd = document.getElementById('save-indicator');
+                const updatedText = document.getElementById('last-updated-text');
+                if (saveInd && updatedText) {
+                    updatedText.textContent = 'Saved just now';
+                    saveInd.classList.add('scale-105');
+                    setTimeout(() => saveInd.classList.remove('scale-105'), 200);
+                }
+            } catch (err) {
+                console.error('Failed to save to localStorage:', err);
+            }
+        }
+
+        // Apply Dark Mode & Sound Icon states
+        function applyThemeAndSoundUI() {
+            const htmlEl = document.documentElement;
+            const themeIcon = document.getElementById('theme-icon');
+            const soundIcon = document.getElementById('sound-icon');
+
+            if (state.darkMode) {
+                htmlEl.classList.add('dark');
+                themeIcon.className = 'ph ph-sun text-lg text-amber-400';
+            } else {
+                htmlEl.classList.remove('dark');
+                themeIcon.className = 'ph ph-moon text-lg';
+            }
+
+            if (state.soundEnabled) {
+                soundIcon.className = 'ph ph-speaker-high text-lg text-brand-500';
+            } else {
+                soundIcon.className = 'ph ph-speaker-slash text-lg text-slate-400';
+            }
+
+            document.getElementById('trip-title-input').value = state.tripTitle;
+        }
+
+        // Escape HTML helper to prevent XSS in custom items
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Update Main Completion Bar & Statistics
+        function renderCompletionDashboard() {
+            const total = state.items.length;
+            const packed = state.items.filter(i => i.packed).length;
+            const unpacked = total - packed;
+            const essentialsTotal = state.items.filter(i => i.essential).length;
+            const essentialsLeft = state.items.filter(i => i.essential && !i.packed).length;
+            const percentage = total === 0 ? 0 : Math.round((packed / total) * 100);
+
+            // Update Text Readouts
+            document.getElementById('completion-percentage').textContent = `${percentage}%`;
+            document.getElementById('completion-subtitle').textContent = `${packed} of ${total} items packed (${unpacked} left)`;
+            document.getElementById('essentials-left-count').textContent = essentialsLeft;
+
+            // Update Filter Badges
+            document.getElementById('badge-all').textContent = total;
+            document.getElementById('badge-unpacked').textContent = unpacked;
+            document.getElementById('badge-packed').textContent = packed;
+            document.getElementById('badge-essential').textContent = essentialsTotal;
+
+            // Progress Bar Width & Style
+            const bar = document.getElementById('main-progress-bar');
+            bar.style.width = `${percentage}%`;
+            bar.setAttribute('aria-valuenow', percentage);
+
+            // Dynamic Status Headline & Emoji
+            const emojiEl = document.getElementById('status-emoji');
+            const headlineEl = document.getElementById('status-headline');
+
+            if (total === 0) {
+                emojiEl.textContent = '📝';
+                headlineEl.textContent = 'Add items to start packing';
+                bar.classList.remove('complete-shimmer');
+            } else if (percentage === 0) {
+                emojiEl.textContent = '🧳';
+                headlineEl.textContent = 'Ready to start packing!';
+                bar.classList.remove('complete-shimmer');
+            } else if (percentage < 50) {
+                emojiEl.textContent = '🚀';
+                headlineEl.textContent = 'Off to a great start';
+                bar.classList.remove('complete-shimmer');
+            } else if (percentage < 100) {
+                emojiEl.textContent = '⚡';
+                headlineEl.textContent = essentialsLeft > 0 ? `Almost there! Don't forget ${essentialsLeft} essential${essentialsLeft > 1 ? 's' : ''}` : 'Almost ready for takeoff!';
+                bar.classList.remove('complete-shimmer');
+            } else {
+                emojiEl.textContent = '🎉';
+                headlineEl.textContent = '100% Packed — Bon Voyage!';
+                bar.classList.add('complete-shimmer');
+                if (state.lastCelebratedCount !== total && total > 0) {
+                    state.lastCelebratedCount = total;
+                    playSound('complete');
+                    triggerConfetti();
+                }
+            }
+
+            if (percentage < 100) {
+                state.lastCelebratedCount = 0;
+            }
+
+            // Render Category Mini-Breakdown Strip
+            const stripEl = document.getElementById('category-breakdown-strip');
+            stripEl.innerHTML = CATEGORIES.map(cat => {
+                const catItems = state.items.filter(i => i.category === cat.id);
+                const catPacked = catItems.filter(i => i.packed).length;
+                const catTotal = catItems.length;
+                const catPct = catTotal === 0 ? 0 : Math.round((catPacked / catTotal) * 100);
+                const isDone = catTotal > 0 && catPacked === catTotal;
+
+                return `
+                    <div class="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between gap-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-semibold truncate flex items-center gap-1 text-slate-700 dark:text-slate-200">
+                                <span>${cat.emoji}</span>
+                                <span class="truncate">${cat.name.split(' ')[0]}</span>
+                            </span>
+                            <span class="font-bold text-[11px] ${isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}">
+                                ${catPacked}/${catTotal}
+                            </span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div class="h-full ${isDone ? 'bg-emerald-500' : cat.barColor} progress-bar-fill rounded-full" style="width: ${catPct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Filter items based on active status filter and search query
+        function getFilteredItems() {
+            const q = state.searchQuery.trim().toLowerCase();
+            return state.items.filter(item => {
+                if (state.filterStatus === 'unpacked' && item.packed) return false;
+                if (state.filterStatus === 'packed' && !item.packed) return false;
+                if (state.filterStatus === 'essential' && !item.essential) return false;
+                if (q && !item.name.toLowerCase().includes(q)) return false;
+                return true;
+            });
+        }
+
+        // Render Categorized Packing Cards
+        function renderCategories() {
+            const filteredItems = getFilteredItems();
+            const container = document.getElementById('categories-container');
+            const emptyState = document.getElementById('empty-state');
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                if (state.items.length === 0) {
+                    document.getElementById('empty-state-title').textContent = 'Your packing list is empty';
+                    document.getElementById('empty-state-desc').textContent = 'Add a custom item above or choose a trip template from the top menu to populate your checklist.';
+                } else {
+                    document.getElementById('empty-state-title').textContent = 'No matching items found';
+                    document.getElementById('empty-state-desc').textContent = 'Try switching your status filter back to "All" or clearing your search query.';
+                }
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            const cardsHTML = CATEGORIES.map(cat => {
+                const catAllItems = state.items.filter(i => i.category === cat.id);
+                const catFilteredItems = filteredItems.filter(i => i.category === cat.id);
+
+                // Hide category card if no items match current filter
+                if (catFilteredItems.length === 0) return '';
+
+                const catPackedCount = catAllItems.filter(i => i.packed).length;
+                const catTotalCount = catAllItems.length;
+                const catPct = catTotalCount === 0 ? 0 : Math.round((catPackedCount / catTotalCount) * 100);
+                const allPackedInCat = catTotalCount > 0 && catPackedCount === catTotalCount;
+
+                // Sort items: unpacked first (essentials on top), packed at bottom
+                const sortedItems = [...catFilteredItems].sort((a, b) => {
+                    if (a.packed !== b.packed) return a.packed ? 1 : -1;
+                    if (a.essential !== b.essential) return a.essential ? -1 : 1;
+                    return 0;
+                });
+
+                const itemsListHTML = sortedItems.map(item => `
+                    <li class="packing-item group flex items-center justify-between gap-2 p-2.5 rounded-2xl border ${
+                        item.packed
+                            ? 'bg-slate-50/70 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/60 opacity-65'
+                            : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800 hover:border-brand-300 dark:hover:border-slate-700 shadow-2xs'
+                    }">
+                        <!-- Checkbox & Item Title -->
+                        <label class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                data-action="toggle-pack"
+                                data-id="${item.id}"
+                                ${item.packed ? 'checked' : ''}
+                                class="sr-only peer"
+                            />
+                            <span class="custom-checkbox w-6 h-6 rounded-xl flex items-center justify-center border-2 transition ${
+                                item.packed
+                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-xs shadow-emerald-500/30'
+                                    : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 group-hover:border-brand-500'
+                            }">
+                                <i class="ph-bold ph-check text-xs ${item.packed ? 'scale-100 opacity-100' : 'scale-50 opacity-0'} transition-all"></i>
+                            </span>
+
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-sm font-medium break-words transition-all ${
+                                        item.packed
+                                            ? 'line-through text-slate-400 dark:text-slate-500'
+                                            : 'text-slate-800 dark:text-slate-100'
+                                    }">
+                                        ${escapeHTML(item.name)}
+                                    </span>
+                                    ${item.essential ? `
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                                            <i class="ph-fill ph-star text-amber-500"></i> Must
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </label>
+
+                        <!-- Item Controls: Quantity Stepper, Essential Toggle, Delete -->
+                        <div class="flex items-center gap-1 shrink-0">
+                            <!-- Quantity Controls -->
+                            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg px-1 py-0.5 text-xs">
+                                <button
+                                    type="button"
+                                    data-action="dec-qty"
+                                    data-id="${item.id}"
+                                    class="w-5 h-5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition flex items-center justify-center"
+                                    title="Decrease quantity"
+                                >-</button>
+                                <span class="px-1.5 font-bold text-[11px] text-slate-700 dark:text-slate-300 min-w-[24px] text-center">${item.qty}x</span>
+                                <button
+                                    type="button"
+                                    data-action="inc-qty"
+                                    data-id="${item.id}"
+                                    class="w-5 h-5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white transition flex items-center justify-center"
+                                    title="Increase quantity"
+                                >+</button>
+                            </div>
+
+                            <!-- Toggle Essential Star -->
+                            <button
+                                type="button"
+                                data-action="toggle-essential"
+                                data-id="${item.id}"
+                                class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition ${
+                                    item.essential ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600 hover:text-amber-400'
+                                }"
+                                title="${item.essential ? 'Remove essential mark' : 'Mark as essential'}"
+                                aria-label="Toggle essential"
+                            >
+                                <i class="ph-fill ph-star text-sm"></i>
+                            </button>
+
+                            <!-- Remove Item Button -->
+                            <button
+                                type="button"
+                                data-action="delete-item"
+                                data-id="${item.id}"
+                                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition"
+                                title="Remove item"
+                                aria-label="Remove item"
+                            >
+                                <i class="ph ph-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </li>
+                `).join('');
+
+                return `
+                    <article class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+                        <div>
+                            <!-- Category Header -->
+                            <div class="flex items-center justify-between gap-2 mb-3">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-10 h-10 rounded-2xl ${cat.badgeBg} flex items-center justify-center text-xl shadow-2xs">
+                                        ${cat.emoji}
+                                    </span>
+                                    <div>
+                                        <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                                            <span>${cat.name}</span>
+                                            ${allPackedInCat ? '<i class="ph-fill ph-check-circle text-emerald-500 text-base" title="Category complete!"></i>' : ''}
+                                        </h3>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                                            ${catPackedCount} of ${catTotalCount} packed (${catPct}%)
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Category Bulk Check/Uncheck Action -->
+                                <button
+                                    type="button"
+                                    data-action="toggle-category-all"
+                                    data-category="${cat.id}"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                        allPackedInCat
+                                            ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                            : 'bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/50 dark:hover:bg-brand-900/60 text-brand-600 dark:text-brand-300'
+                                    }"
+                                >
+                                    ${allPackedInCat ? 'Unpack Cat.' : 'Pack All'}
+                                </button>
+                            </div>
+
+                            <!-- Category Progress Bar -->
+                            <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
+                                <div class="h-full ${allPackedInCat ? 'bg-emerald-500' : cat.barColor} progress-bar-fill rounded-full" style="width: ${catPct}%"></div>
+                            </div>
+
+                            <!-- Items List -->
+                            <ul class="space-y-2">
+                                ${itemsListHTML}
+                            </ul>
+                        </div>
+
+                        <!-- Quick Inline Category Add Footer -->
+                        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/70">
+                            <button
+                                type="button"
+                                data-action="quick-focus-category"
+                                data-category="${cat.id}"
+                                class="w-full py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition flex items-center justify-center gap-1"
+                            >
+                                <i class="ph-bold ph-plus"></i>
+                                <span>Add item to ${cat.name}</span>
+                            </button>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+
+            container.innerHTML = cardsHTML;
+        }
+
+        // Master Render Function
+        function renderApp() {
+            renderCompletionDashboard();
+            renderCategories();
+            updateFilterButtonsUI();
+        }
+
+        // Update Filter Tabs Styling
+        function updateFilterButtonsUI() {
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                const isSelected = btn.getAttribute('data-filter') === state.filterStatus;
+                if (isSelected) {
+                    btn.className = 'status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm';
+                } else {
+                    btn.className = 'status-filter-btn py-2 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+                }
+            });
+        }
+
+        // Toast Notification Helper (supports optional Undo callback)
+        function showToast(message, undoCallback = null) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto flex items-center justify-between gap-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-2xl shadow-lg text-xs sm:text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0';
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = message;
+            toast.appendChild(textSpan);
+
+            if (undoCallback) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'px-2.5 py-1 rounded-lg bg-brand-500 hover:bg-brand-400 text-white font-bold text-xs shrink-0 transition';
+                undoBtn.textContent = 'Undo';
+                undoBtn.addEventListener('click', () => {
+                    undoCallback();
+                    toast.remove();
+                });
+                toast.appendChild(undoBtn);
+            }
+
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Custom Confirmation Modal Helper
+        let modalConfirmHandler = null;
+        function openConfirmModal({ title, message, confirmText = 'Confirm', onConfirm }) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-confirm-btn').textContent = confirmText;
+
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            modalConfirmHandler = () => {
+                onConfirm();
+                closeConfirmModal();
+            };
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modalConfirmHandler = null;
+        }
+
+        // Confetti Celebration Animation (Canvas)
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.classList.remove('hidden');
+
+            const colors = ['#2aa4ff', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
+            const particles = Array.from({ length: 85 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * -canvas.height * 0.5 - 20,
+                size: Math.random() * 7 + 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                speedY: Math.random() * 3.5 + 2.5,
+                speedX: (Math.random() - 0.5) * 3,
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 8
+            }));
+
+            let frame = 0;
+            function animateConfetti() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let active = false;
+
+                particles.forEach(p => {
+                    p.y += p.speedY;
+                    p.x += p.speedX;
+                    p.rotation += p.rotationSpeed;
+
+                    if (p.y < canvas.height + 20) active = true;
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rotation * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
+                    ctx.restore();
+                });
+
+                frame++;
+                if (active && frame < 240) {
+                    requestAnimationFrame(animateConfetti);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    canvas.classList.add('hidden');
+                }
+            }
+            requestAnimationFrame(animateConfetti);
+        }
+
+        // Event Listeners Setup
+        function initEventListeners() {
+            // Trip Title Rename
+            const titleInput = document.getElementById('trip-title-input');
+            titleInput.addEventListener('input', (e) => {
+                state.tripTitle = e.target.value.trim() || 'My Holiday Checklist';
+                saveState();
+            });
+
+            // Add Item Form Quantity & Essential Controls
+            document.getElementById('qty-minus').addEventListener('click', () => {
+                if (state.newItemQty > 1) {
+                    state.newItemQty--;
+                    document.getElementById('new-item-qty-display').textContent = `${state.newItemQty}x`;
+                }
+            });
+
+            document.getElementById('qty-plus').addEventListener('click', () => {
+                if (state.newItemQty < 99) {
+                    state.newItemQty++;
+                    document.getElementById('new-item-qty-display').textContent = `${state.newItemQty}x`;
+                }
+            });
+
+            const essentialBtn = document.getElementById('new-item-essential-btn');
+            const essentialStarIcon = document.getElementById('essential-star-icon');
+            essentialBtn.addEventListener('click', () => {
+                state.newItemEssential = !state.newItemEssential;
+                essentialBtn.setAttribute('aria-pressed', state.newItemEssential);
+                if (state.newItemEssential) {
+                    essentialBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-amber-400 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 transition';
+                    essentialStarIcon.className = 'ph-fill ph-star text-amber-500 transition-colors';
+                } else {
+                    essentialBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400 transition';
+                    essentialStarIcon.className = 'ph-fill ph-star text-slate-400 transition-colors';
+                }
+            });
+
+            // Submit New Custom Item
+            document.getElementById('add-item-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const nameInput = document.getElementById('new-item-name');
+                const categorySelect = document.getElementById('new-item-category');
+                const name = nameInput.value.trim();
+
+                if (!name) return;
+
+                const newItem = {
+                    id: 'custom_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                    name,
+                    category: categorySelect.value,
+                    qty: state.newItemQty,
+                    packed: false,
+                    essential: state.newItemEssential
+                };
+
+                state.items.unshift(newItem);
+
+                // Reset form fields
+                nameInput.value = '';
+                state.newItemQty = 1;
+                state.newItemEssential = false;
+                document.getElementById('new-item-qty-display').textContent = '1x';
+                essentialBtn.setAttribute('aria-pressed', 'false');
+                essentialBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400 transition';
+                essentialStarIcon.className = 'ph-fill ph-star text-slate-400 transition-colors';
+
+                // Ensure filter shows the newly added item
+                if (state.filterStatus === 'packed') {
+                    state.filterStatus = 'all';
+                }
+
+                playSound('check');
+                saveState();
+                renderApp();
+                showToast(`Added "${name}" to checklist`);
+            });
+
+            // Delegated Click & Change Events inside Categories Container
+            const categoriesContainer = document.getElementById('categories-container');
+
+            categoriesContainer.addEventListener('change', (e) => {
+                const target = e.target;
+                if (target.getAttribute('data-action') === 'toggle-pack') {
+                    const id = target.getAttribute('data-id');
+                    const item = state.items.find(i => i.id === id);
+                    if (item) {
+                        item.packed = target.checked;
+                        playSound(item.packed ? 'check' : 'uncheck');
+                        saveState();
+                        renderApp();
+                    }
+                }
+            });
+
+            categoriesContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-action]');
+                if (!btn) return;
+
+                const action = btn.getAttribute('data-action');
+                const id = btn.getAttribute('data-id');
+
+                if (action === 'inc-qty') {
+                    const item = state.items.find(i => i.id === id);
+                    if (item && item.qty < 99) {
+                        item.qty++;
+                        saveState();
+                        renderApp();
+                    }
+                } else if (action === 'dec-qty') {
+                    const item = state.items.find(i => i.id === id);
+                    if (item && item.qty > 1) {
+                        item.qty--;
+                        saveState();
+                        renderApp();
+                    }
+                } else if (action === 'toggle-essential') {
+                    const item = state.items.find(i => i.id === id);
+                    if (item) {
+                        item.essential = !item.essential;
+                        saveState();
+                        renderApp();
+                    }
+                } else if (action === 'delete-item') {
+                    const idx = state.items.findIndex(i => i.id === id);
+                    if (idx !== -1) {
+                        const [removed] = state.items.splice(idx, 1);
+                        saveState();
+                        renderApp();
+                        showToast(`Removed "${removed.name}"`, () => {
+                            state.items.splice(idx, 0, removed);
+                            saveState();
+                            renderApp();
+                        });
+                    }
+                } else if (action === 'toggle-category-all') {
+                    const catId = btn.getAttribute('data-category');
+                    const catItems = state.items.filter(i => i.category === catId);
+                    const allPacked = catItems.length > 0 && catItems.every(i => i.packed);
+                    catItems.forEach(i => { i.packed = !allPacked; });
+                    playSound(!allPacked ? 'check' : 'uncheck');
+                    saveState();
+                    renderApp();
+                } else if (action === 'quick-focus-category') {
+                    const catId = btn.getAttribute('data-category');
+                    const catSelect = document.getElementById('new-item-category');
+                    const nameInput = document.getElementById('new-item-name');
+                    catSelect.value = catId;
+                    nameInput.focus();
+                    nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+
+            // Status Filter Buttons
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.filterStatus = btn.getAttribute('data-filter');
+                    renderApp();
+                });
+            });
+
+            // Search Input & Clear Button
+            const searchInput = document.getElementById('search-input');
+            const clearSearchBtn = document.getElementById('clear-search-btn');
+
+            searchInput.addEventListener('input', (e) => {
+                state.searchQuery = e.target.value;
+                clearSearchBtn.classList.toggle('hidden', !state.searchQuery);
+                renderApp();
+            });
+
+            clearSearchBtn.addEventListener('click', () => {
+                state.searchQuery = '';
+                searchInput.value = '';
+                clearSearchBtn.classList.add('hidden');
+                renderApp();
+            });
+
+            document.getElementById('clear-filters-btn').addEventListener('click', () => {
+                state.filterStatus = 'all';
+                state.searchQuery = '';
+                searchInput.value = '';
+                clearSearchBtn.classList.add('hidden');
+                renderApp();
+            });
+
+            // Bulk Actions: Pack All & Unpack All
+            document.getElementById('uncheck-all-btn').addEventListener('click', () => {
+                if (state.items.every(i => !i.packed)) {
+                    showToast('All items are already unpacked');
+                    return;
+                }
+                openConfirmModal({
+                    title: 'Unpack All Items?',
+                    message: 'This will uncheck all items so you can reuse your custom list for your return trip or next holiday.',
+                    confirmText: 'Unpack All',
+                    onConfirm: () => {
+                        state.items.forEach(i => { i.packed = false; });
+                        playSound('uncheck');
+                        saveState();
+                        renderApp();
+                        showToast('All items marked as unpacked');
+                    }
+                });
+            });
+
+            document.getElementById('pack-all-btn').addEventListener('click', () => {
+                if (state.items.length === 0) return;
+                state.items.forEach(i => { i.packed = true; });
+                saveState();
+                renderApp();
+            });
+
+            // Reset Default List
+            document.getElementById('reset-defaults-btn').addEventListener('click', () => {
+                openConfirmModal({
+                    title: 'Reset to Default Checklist?',
+                    message: 'This will restore the default holiday packing list and remove any custom items you added.',
+                    confirmText: 'Reset Checklist',
+                    onConfirm: () => {
+                        state.tripTitle = PRESET_TEMPLATES.beach.title;
+                        state.items = JSON.parse(JSON.stringify(PRESET_TEMPLATES.beach.items));
+                        state.filterStatus = 'all';
+                        state.searchQuery = '';
+                        document.getElementById('trip-title-input').value = state.tripTitle;
+                        saveState();
+                        renderApp();
+                        showToast('Restored default packing checklist');
+                    }
+                });
+            });
+
+            // Preset Templates Dropdown Menu
+            const templatesBtn = document.getElementById('templates-btn');
+            const templatesMenu = document.getElementById('templates-menu');
+
+            templatesBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                templatesMenu.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', () => {
+                templatesMenu.classList.add('hidden');
+            });
+
+            document.querySelectorAll('.template-option').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.getAttribute('data-template');
+                    const preset = PRESET_TEMPLATES[key];
+                    if (!preset) return;
+
+                    openConfirmModal({
+                        title: `Load "${preset.title}" Template?`,
+                        message: 'Loading a new template will replace your current checklist items with curated items for this trip style.',
+                        confirmText: 'Load Template',
+                        onConfirm: () => {
+                            state.tripTitle = preset.title;
+                            state.items = JSON.parse(JSON.stringify(preset.items));
+                            state.filterStatus = 'all';
+                            document.getElementById('trip-title-input').value = state.tripTitle;
+                            saveState();
+                            renderApp();
+                            showToast(`Loaded ${preset.title} template`);
+                        }
+                    });
+                });
+            });
+
+            // Copy Checklist Summary to Clipboard (using document.execCommand('copy') for iframe compatibility)
+            document.getElementById('copy-list-btn').addEventListener('click', () => {
+                const packed = state.items.filter(i => i.packed).length;
+                const total = state.items.length;
+                const pct = total === 0 ? 0 : Math.round((packed / total) * 100);
+
+                let text = `🧳 ${state.tripTitle} (${packed}/${total} packed - ${pct}%)\n`;
+                text += `====================================\n`;
+
+                CATEGORIES.forEach(cat => {
+                    const catItems = state.items.filter(i => i.category === cat.id);
+                    if (catItems.length > 0) {
+                        text += `\n${cat.emoji} ${cat.name.toUpperCase()}\n`;
+                        catItems.forEach(item => {
+                            const box = item.packed ? '[x]' : '[ ]';
+                            const star = item.essential ? ' ⭐' : '';
+                            text += `${box} ${item.name} (${item.qty}x)${star}\n`;
+                        });
+                    }
+                });
+
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = text;
+                tempTextArea.style.position = 'fixed';
+                tempTextArea.style.left = '-9999px';
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Checklist copied to clipboard!');
+                } catch (err) {
+                    showToast('Could not copy checklist');
+                }
+                document.body.removeChild(tempTextArea);
+            });
+
+            // Sound & Theme Toggles
+            document.getElementById('sound-toggle-btn').addEventListener('click', () => {
+                state.soundEnabled = !state.soundEnabled;
+                applyThemeAndSoundUI();
+                saveState();
+                showToast(state.soundEnabled ? 'Sound effects enabled' : 'Sound effects muted');
+            });
+
+            document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+                state.darkMode = !state.darkMode;
+                applyThemeAndSoundUI();
+                saveState();
+            });
+
+            // Modal Cancel & Confirm Buttons
+            document.getElementById('modal-cancel-btn').addEventListener('click', closeConfirmModal);
+            document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+                if (typeof modalConfirmHandler === 'function') {
+                    modalConfirmHandler();
+                }
+            });
+        }
+
+        // Initialize Application on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            initEventListeners();
+            renderApp();
+        });
+    </script>
+</body>
+</html>
